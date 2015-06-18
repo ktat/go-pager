@@ -133,14 +133,14 @@ func (p *Pager) PollEvent() bool {
 					}
 					p.Draw()
 				default:
-					if ev.Ch == 106 { // j
+					if ev.Ch == 'j' {
 						p.scrollDown()
-					} else if ev.Ch == 107 { // k
+					} else if ev.Ch == 'k' {
 						p.scrollUp()
-					} else if ev.Ch == 113 { // q
+					} else if ev.Ch == 'q' {
 						termbox.Sync()
 						return false
-					} else if ev.Ch == 47 { // /
+					} else if ev.Ch == '/' {
 						p.isSlashOn = true
 						p.Draw()
 					} else {
@@ -156,15 +156,17 @@ func (p *Pager) PollEvent() bool {
 				switch ev.Key {
 				case termbox.KeyEnter:
 					// nothing to do
+				case termbox.KeyDelete, termbox.KeyCtrlD, termbox.KeyBackspace, termbox.KeyBackspace2:
+					p.deleteSearchString()
 				case termbox.KeyEsc:
 					p.isSearchMode = false
 					p.isSlashOn = false
 					p.searchIndex = 1
 					p.searchString = ""
 				default:
-					if ev.Ch == 110 { // n
+					if ev.Ch == 'n' {
 						p.searchForward()
-					} else if ev.Ch == 78 { // N
+					} else if ev.Ch == 'N' {
 						p.searchBackward()
 					} else {
 						p.searchIndex = 1
@@ -178,6 +180,8 @@ func (p *Pager) PollEvent() bool {
 			switch ev := termbox.PollEvent(); ev.Type {
 			case termbox.EventKey:
 				switch ev.Key {
+				case termbox.KeyDelete, termbox.KeyCtrlD, termbox.KeyBackspace, termbox.KeyBackspace2:
+					p.deleteSearchString()
 				case termbox.KeyEnter:
 					p.isSearchMode = true
 					p.searchForward()
@@ -192,6 +196,12 @@ func (p *Pager) PollEvent() bool {
 		}
 	}
 	return false
+}
+
+func (p *Pager) deleteSearchString() {
+	if len(p.searchString) > 0 {
+		p.searchString = p.searchString[0 : len(p.searchString)-1]
+	}
 }
 
 func (p *Pager) searchForward() {
