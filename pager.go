@@ -159,6 +159,7 @@ func (p *Pager) PollEvent() bool {
 				case termbox.KeyEsc:
 					p.isSearchMode = false
 					p.isSlashOn = false
+					p.searchIndex = 1
 					p.searchString = ""
 				default:
 					if ev.Ch == 110 { // n
@@ -166,6 +167,7 @@ func (p *Pager) PollEvent() bool {
 					} else if ev.Ch == 78 { // N
 						p.searchBackward()
 					} else {
+						p.searchIndex = 1
 						p.searchString += string(ev.Ch)
 						p.isSearchMode = false
 					}
