@@ -57,7 +57,7 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 						i += 4
 						minusX += 5
 						continue
-					} else if i+4 <= len(runes) && string(runes[i+2:i+4]) == "0m" {
+					} else if i+4 <= len(runes) && string(runes[i+1:i+4]) == "[0m" {
 						// reset
 						color = termbox.ColorDefault
 
@@ -140,6 +140,16 @@ func (p *Pager) PollEvent() bool {
 					} else if ev.Ch == 'q' {
 						termbox.Sync()
 						return false
+					} else if ev.Ch == '<' {
+						p.ignore = 0
+						return true
+					} else if ev.Ch == '>' {
+						matched := regexp.MustCompile("(?s)\\n").FindAllString(p.Str, -1)
+						_, y := termbox.Size()
+						p.ignore =  len(matched) - y
+						println(p.ignore)
+						termbox.Sync()
+						p.Draw()
 					} else if ev.Ch == '/' {
 						p.isSlashOn = true
 						p.Draw()
@@ -206,7 +216,7 @@ func (p *Pager) deleteSearchString() {
 
 func (p *Pager) searchForward() {
 	var lines []string
-	matched := regexp.MustCompile(p.searchString).FindAllStringIndex(p.Str, p.searchIndex)
+	matched := regexp.MustCompile(p.searchString).FindAllStringIndex(regexp.MustCompile("\\033\\[\\d+\\[m(.+?)0m").ReplaceAllString(p.Str, "$1"), p.searchIndex)
 	if len(matched) > 0 {
 		if len(matched) >= p.searchIndex {
 			lines = regexp.MustCompile("(?m)\\n").FindAllString(p.Str[0:matched[p.searchIndex-1][1]], -1)
@@ -219,7 +229,7 @@ func (p *Pager) searchForward() {
 
 func (p *Pager) searchBackward() {
 	var lines []string
-	matched := regexp.MustCompile(p.searchString).FindAllStringIndex(p.Str, p.searchIndex)
+	matched := regexp.MustCompile(p.searchString).FindAllStringIndex(regexp.MustCompile("\\033\\[\\d+\\[m(.+?)0m").ReplaceAllString(p.Str, "$1"), p.searchIndex)
 	if len(matched) > 0 {
 		if p.searchIndex > 2 {
 			p.searchIndex--
