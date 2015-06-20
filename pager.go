@@ -213,7 +213,11 @@ func (p *Pager) PollEvent() bool {
 					p.isSlashOn = false
 					p.searchStr = ""
 				default:
-					if ev.Ch == 'n' {
+					if ev.Ch == 'q' {
+						p.isSearchMode = false
+						p.isSlashOn = false
+						p.searchStr = ""
+					} else	if ev.Ch == 'n' {
 						p.searchForward()
 					} else if ev.Ch == 'N' {
 						p.searchBackward()
@@ -223,7 +227,7 @@ func (p *Pager) PollEvent() bool {
 				}
 			}
 			p.Draw()
-		} else {
+		} else { // isSlashOn
 			switch ev := termbox.PollEvent(); ev.Type {
 			case termbox.EventKey:
 				switch ev.Key {
@@ -261,6 +265,8 @@ func (p *Pager) searchForward() {
 	if len(matched) >= p.searchIndex {
 		p.ignoreY = p.getLines(p.Str[0:matched[p.searchIndex-1][1]]) - 1
 		p.searchIndex++
+	} else {
+		p.ignoreY = p.searchIndex -1
 	}
 }
 
@@ -269,6 +275,8 @@ func (p *Pager) searchBackward() {
 	if len(matched) > 0 && p.searchIndex > 2 {
 		p.searchIndex--
 		p.ignoreY = p.getLines(p.Str[0:matched[p.searchIndex-1][1]]) - 1
+	} else {
+		p.ignoreY = p.searchIndex -1
 	}
 }
 
