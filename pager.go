@@ -28,6 +28,7 @@ func (p *Pager) SetContent(s string) {
 func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 	color := termbox.ColorDefault
 	backgroundColor := termbox.ColorDefault
+	foundIndex := 0
 	runes := []rune(str)
 
 	minusX := 0
@@ -43,10 +44,22 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 		"37m": termbox.ColorWhite,
 	}
 
+	searchStringLen := len(p.searchStr)
+
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == '\n' {
 			y++
 			minusX = i + 1
+		}
+		if (searchStringLen > 0 && i+searchStringLen < len(runes)) {
+			if (string(runes[i : i+searchStringLen]) == p.searchStr[foundIndex:searchStringLen]) {
+				backgroundColor = termbox.ColorCyan
+				foundIndex = searchStringLen - 1
+			} else if foundIndex == 0 {
+				backgroundColor = termbox.ColorDefault
+			} else {
+				foundIndex--
+			}
 		}
 		if i+2 < len(runes) {
 			colorLiteral := string(runes[i : i+2])
@@ -91,7 +104,7 @@ func (p *Pager) Draw() {
 		file = "[file: " + p.File + " ] ::"
 	}
 	if p.isSearchMode {
-		mode = " :: " + fmt.Sprintf(file+"[searching: %s (skip lines: %d)] :: [forward search: n] [backward search: N] [exit search: ESC], Ctrl-C", p.searchStr, p.ignoreY)
+		mode = " :: " + fmt.Sprintf(file+"[searching: %s (lines: %d)] :: [forward search: n] [backward search: N] [exit search: ESC/Ctrl-C]", p.searchStr, p.ignoreY)
 	} else if p.isSlashOn {
 		mode = " :: " + fmt.Sprintf(file+"[input search string: %s ]", p.searchStr)
 	} else if file != "" {
@@ -100,8 +113,76 @@ func (p *Pager) Draw() {
 	if len(p.Files) > 1 {
 		nextFileUsage = "[next file: Ctrl-h,Ctrl-l]"
 	}
-	p.drawLine(0, 0, "USAGE [exit: ESC/q] [scroll: j/k, C-n/C-p] "+nextFileUsage+mode+string(empty), false)
+	p.drawLine(0, 0, "USAGE [exit: ESC/q] [scroll: j,k/C-n,C-p] "+nextFileUsage+mode+string(empty), false)
 	termbox.Flush()
+}
+
+func (p *Pager) viewModeKey(ev termbox.Event) int {
+	switch ev.Key {
+	case termbox.KeyEsc, termbox.KeyCtrlC:
+		termbox.Flush()
+		return 0
+	case termbox.KeyArrowRight, termbox.KeyCtrlL:
+		if p.isMaxIndex() {
+			p.Index--
+		} else {
+			termbox.Sync()
+		}
+		termbox.Flush()
+		return 1
+	case termbox.KeyArrowLeft, termbox.KeyCtrlH:
+		if p.Index >= 1 {
+			p.Index -= 2
+			termbox.Sync()
+			return 1
+		}
+		p.Draw()
+	case termbox.KeyCtrlN, termbox.KeyArrowDown,termbox.KeyEnter:
+		p.scrollDown()
+	case termbox.KeyCtrlP, termbox.KeyArrowUp:
+		p.scrollUp()
+	case termbox.KeyCtrlD, termbox.KeySpace:
+		matched := regexp.MustCompile("(?s)\\n").FindAllString(p.Str, -1)
+		_, y := termbox.Size()
+		if p.ignoreY+29 < (len(matched) - y) {
+			p.ignoreY += 29
+		} else {
+			p.ignoreY = len(matched) - y
+		}
+		p.Draw()
+	case termbox.KeyCtrlU:
+		p.ignoreY -= 29
+		if p.ignoreY < 0 {
+			p.ignoreY = 0
+		}
+		p.Draw()
+	default:
+		if ev.Ch == 'j' {
+			p.scrollDown()
+		} else if ev.Ch == 'k' {
+			p.scrollUp()
+		} else if ev.Ch == 'q' {
+			termbox.Sync()
+			return 0
+		} else if ev.Ch == '<' {
+			p.ignoreY = 0
+			return 1
+		} else if ev.Ch == '>' {
+			matched := regexp.MustCompile("(?s)\\n").FindAllString(p.Str, -1)
+			_, y := termbox.Size()
+			p.ignoreY = len(matched) - y
+			println(p.ignoreY)
+			termbox.Sync()
+			p.Draw()
+		} else if ev.Ch == '/' {
+			p.isSlashOn = true
+			p.isSearchMode = false
+			p.Draw()
+		} else {
+			p.Draw()
+		}
+	}
+	return 2
 }
 
 func (p *Pager) PollEvent() bool {
@@ -110,68 +191,11 @@ func (p *Pager) PollEvent() bool {
 		if p.isSlashOn == false {
 			switch ev := termbox.PollEvent(); ev.Type {
 			case termbox.EventKey:
-				switch ev.Key {
-				case termbox.KeyEsc,termbox.KeyCtrlC:
-					termbox.Flush()
-					return false
-				case termbox.KeyArrowRight, termbox.KeyCtrlL:
-					if p.isMaxIndex() {
-						p.Index--
-					} else {
-						termbox.Sync()
-					}
-					termbox.Flush()
+				ret := p.viewModeKey(ev)
+				if ret == 1 {
 					return true
-				case termbox.KeyArrowLeft, termbox.KeyCtrlH:
-					if p.Index >= 1 {
-						p.Index -= 2
-						termbox.Sync()
-						return true
-					}
-					p.Draw()
-				case termbox.KeyCtrlN, termbox.KeyArrowDown:
-					p.scrollDown()
-				case termbox.KeyCtrlP, termbox.KeyArrowUp:
-					p.scrollUp()
-				case termbox.KeyCtrlD, termbox.KeySpace:
-					matched := regexp.MustCompile("(?s)\\n").FindAllString(p.Str, -1)
-					_, y := termbox.Size()
-					if p.ignoreY+29 < (len(matched) - y) {
-						p.ignoreY += 29
-					} else {
-						p.ignoreY = len(matched) - y
-					}
-					p.Draw()
-				case termbox.KeyCtrlU:
-					p.ignoreY -= 29
-					if p.ignoreY < 0 {
-						p.ignoreY = 0
-					}
-					p.Draw()
-				default:
-					if ev.Ch == 'j' {
-						p.scrollDown()
-					} else if ev.Ch == 'k' {
-						p.scrollUp()
-					} else if ev.Ch == 'q' {
-						termbox.Sync()
-						return false
-					} else if ev.Ch == '<' {
-						p.ignoreY = 0
-						return true
-					} else if ev.Ch == '>' {
-						matched := regexp.MustCompile("(?s)\\n").FindAllString(p.Str, -1)
-						_, y := termbox.Size()
-						p.ignoreY = len(matched) - y
-						println(p.ignoreY)
-						termbox.Sync()
-						p.Draw()
-					} else if ev.Ch == '/' {
-						p.isSlashOn = true
-						p.Draw()
-					} else {
-						p.Draw()
-					}
+				} else if ret == 0 {
+					return false
 				}
 			default:
 				p.Draw()
@@ -194,10 +218,7 @@ func (p *Pager) PollEvent() bool {
 					} else if ev.Ch == 'N' {
 						p.searchBackward()
 					} else {
-						// input search string
-						p.searchIndex = 1
-						p.searchStr += string(ev.Ch)
-						p.isSearchMode = false
+						p.viewModeKey(ev)
 					}
 				}
 			}
