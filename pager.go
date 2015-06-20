@@ -7,16 +7,16 @@ import (
 )
 
 type Pager struct {
-	str          string // contents to display
-	lines        int
+	str          string   // contents to display
+	lines        int      // num of lines in str
 	Files        []string // files
 	ignoreY      int      // ignore lines
 	Index        int      // file index
 	File         string   // current file
-	isSlashOn    bool
-	isSearchMode bool
-	searchIndex  int
-	searchStr    string
+	isSlashOn    bool     // input search string mode
+	isSearchMode bool     // search mode
+	searchIndex  int      // current search index
+	searchStr    string   // string to search
 }
 
 func (p *Pager) SetContent(s string) {
