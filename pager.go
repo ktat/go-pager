@@ -34,24 +34,40 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 	minusX := 0
 
 	colorMap := map[string]termbox.Attribute{
-		"30m": termbox.ColorBlack,
-		"31m": termbox.ColorRed,
-		"32m": termbox.ColorGreen,
-		"33m": termbox.ColorYellow,
-		"34m": termbox.ColorBlue,
-		"35m": termbox.ColorMagenta,
-		"36m": termbox.ColorCyan,
-		"37m": termbox.ColorWhite,
+		"0m": termbox.ColorBlack,
+		"1m": termbox.ColorRed,
+		"2m": termbox.ColorGreen,
+		"3m": termbox.ColorYellow,
+		"4m": termbox.ColorBlue,
+		"5m": termbox.ColorMagenta,
+		"6m": termbox.ColorCyan,
+		"7m": termbox.ColorWhite,
+	}
+	attrMap := map[string]termbox.Attribute{
+		"1m": termbox.AttrBold,
+		"3m": termbox.AttrReverse,
+		"4m": termbox.AttrUnderline,
+	}
+
+	if false {
+		// for debug
+		for i := 0; i < len(runes); i++ {
+			if runes[i] == '\033' {
+				print("ESC")
+			} else {
+				print(string(runes[i]))
+			}
+		}
+		panic(1)
 	}
 
 	searchStringLen := len(p.searchStr)
-
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == '\n' {
 			y++
 			minusX = i + 1
 		}
-		if searchStringLen > 0 && i+searchStringLen < len(runes) {
+		if searchStringLen > 0 && i+searchStringLen < len(runes) { // highlight search string
 			if string(runes[i:i+searchStringLen]) == p.searchStr[foundIndex:searchStringLen] {
 				backgroundColor = termbox.ColorCyan
 				foundIndex = searchStringLen - 1
@@ -61,33 +77,66 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 				foundIndex--
 			}
 		}
-		if i+2 < len(runes) {
-			colorLiteral := string(runes[i : i+2])
-			if colorLiteral == "\033[" {
-				if runes[i+2] == '3' && runes[i+4] == 'm' {
-					// color
-					c := string(runes[i+2 : i+5])
-					color = colorMap[c]
-
-					i += 4
-					minusX += 5
-					continue
-				} else if i+4 <= len(runes) && string(runes[i+1:i+4]) == "[0m" {
-					// reset
+		if runes[i] == '\033' { // not good
+			minusX++
+			if i+2 < len(runes) && string(runes[i:i+3]) == "\033[m" { // reset?
+				color = termbox.ColorDefault
+				backgroundColor = termbox.ColorDefault
+				i += 2
+				minusX += 2
+			} else if i+3 < len(runes) && runes[i+1] == '[' && runes[i+3] == 'm' {
+				t := string(runes[i+2 : i+4])
+				if t == "0m" { // reset
 					color = termbox.ColorDefault
-
-					i += 3
-					minusX += 4
-					continue
+					backgroundColor = termbox.ColorDefault
+				} else { // attribute
+					if a, ok := attrMap[t]; ok {
+						color |= a
+					} else {
+						// not supported attribute
+					}
 				}
-				continue
+				i += 3
+				minusX += 3
+			} else if i+4 < len(runes) && string(runes[i:i+2]) == "\033[" && (runes[i+2] == '0' || runes[i+2] == '3' || runes[i+2] == '4') && runes[i+4] == 'm' { // \033[30m or  \033[40m
+				// color
+				c := string(runes[i+3 : i+5])
+				if runes[i+2] == '3' {
+					color = colorMap[c]
+				} else if runes[i+2] == '4' {
+					backgroundColor = colorMap[c]
+				} else {
+					panic(1)
+					color |= termbox.AttrBold
+				}
+				i += 4
+				minusX += 4
+			} else if i+7 < len(runes) && string(runes[i:i+2]) == "\033[" && runes[i+4] == ';' && (runes[i+5] == '3' || runes[i+2] == '4') && runes[i+7] == 'm' { // \033[01;30m or \033[01;40m
+				// attr + color
+				a := string(runes[i+2 : i+4])
+				c := string(runes[i+6 : i+8])
+				if runes[i+2] == '3' {
+					color = colorMap[c]
+				} else {
+					backgroundColor = colorMap[c]
+				}
+				if a == "01" {
+					color |= termbox.AttrBold
+				}
+				i += 7
+				minusX += 7
+			} else if i+1 < len(runes) && string(runes[i:i+2]) == "\033[" { // \033[K
+				i += 2
+				minusX += 2
 			}
+			continue
 		}
 		if canSkip {
 			termbox.SetCell(x+i-minusX, y-(p.ignoreY)+1, runes[i], color, backgroundColor)
 		} else {
 			termbox.SetCell(x+i, y, runes[i], termbox.ColorBlue, termbox.ColorWhite)
 		}
+
 	}
 }
 
@@ -113,7 +162,8 @@ func (p *Pager) Draw() {
 	if len(p.Files) > 1 {
 		nextFileUsage = "[next file: Ctrl-h,Ctrl-l]"
 	}
-	p.drawLine(0, 0, "USAGE [exit: ESC/q] [scroll: j,k/C-n,C-p] "+nextFileUsage+mode+string(empty), false)
+	searchIndex := fmt.Sprintf("(Index: %d)", p.searchIndex)
+	p.drawLine(0, 0, "USAGE [exit: ESC/q] [scroll: j,k/C-n,C-p] "+searchIndex+nextFileUsage+mode+string(empty), false)
 	termbox.Flush()
 }
 
@@ -257,20 +307,22 @@ func (p *Pager) deleteSearchString() {
 }
 
 func (p *Pager) searchString() [][]int {
-	return regexp.MustCompile("(?mi)^.*"+p.searchStr+".*$").FindAllStringIndex(regexp.MustCompile("\\033\\[\\d+\\[m(.+?)0m").ReplaceAllString(p.str, "$1"), p.searchIndex)
+	return regexp.MustCompile("(?mi)^.*"+p.searchStr+".*$").FindAllStringIndex(regexp.MustCompile("\\033\\[\\d+\\[m(.+?)0m").ReplaceAllString(p.str, "$1"), -1)
 }
 
 func (p *Pager) searchForward() {
 	matched := p.searchString()
 	if len(matched) >= p.searchIndex {
 		p.ignoreY = p.getLines(p.str[0:matched[p.searchIndex-1][1]]) - 1
-		p.searchIndex++
+		if len(matched) > p.searchIndex {
+			p.searchIndex++
+		}
 	}
 }
 
 func (p *Pager) searchBackward() {
 	matched := p.searchString()
-	if len(matched) > 0 && p.searchIndex > 2 {
+	if len(matched) > 0 && p.searchIndex > 1 {
 		p.searchIndex--
 		p.ignoreY = p.getLines(p.str[0:matched[p.searchIndex-1][1]]) - 1
 	}
