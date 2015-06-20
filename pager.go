@@ -7,7 +7,7 @@ import (
 )
 
 type Pager struct {
-	Str          string // contents to display
+	str          string // contents to display
 	lines        int
 	Files        []string // files
 	ignoreY      int      // ignore lines
@@ -20,8 +20,8 @@ type Pager struct {
 }
 
 func (p *Pager) SetContent(s string) {
-	p.Str = s
-	lines := regexp.MustCompile("(?m)$").FindAllString(p.Str, -1)
+	p.str = s
+	lines := regexp.MustCompile("(?m)$").FindAllString(p.str, -1)
 	p.lines = len(lines)
 }
 
@@ -94,7 +94,7 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 func (p *Pager) Draw() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
-	p.drawLine(0, 0, p.Str, true)
+	p.drawLine(0, 0, p.str, true)
 	maxX, _ := termbox.Size()
 	empty := make([]byte, maxX)
 	mode := ""
@@ -142,7 +142,7 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 	case termbox.KeyCtrlP, termbox.KeyArrowUp:
 		p.scrollUp()
 	case termbox.KeyCtrlD, termbox.KeySpace:
-		matched := regexp.MustCompile("(?s)\\n").FindAllString(p.Str, -1)
+		matched := regexp.MustCompile("(?s)\\n").FindAllString(p.str, -1)
 		_, y := termbox.Size()
 		if p.ignoreY+29 < (len(matched) - y) {
 			p.ignoreY += 29
@@ -168,7 +168,7 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			p.ignoreY = 0
 			return 1
 		} else if ev.Ch == '>' {
-			matched := regexp.MustCompile("(?s)\\n").FindAllString(p.Str, -1)
+			matched := regexp.MustCompile("(?s)\\n").FindAllString(p.str, -1)
 			_, y := termbox.Size()
 			p.ignoreY = len(matched) - y
 			println(p.ignoreY)
@@ -257,13 +257,13 @@ func (p *Pager) deleteSearchString() {
 }
 
 func (p *Pager) searchString() [][]int {
-	return regexp.MustCompile("(?mi)^.*"+p.searchStr+".*$").FindAllStringIndex(regexp.MustCompile("\\033\\[\\d+\\[m(.+?)0m").ReplaceAllString(p.Str, "$1"), p.searchIndex)
+	return regexp.MustCompile("(?mi)^.*"+p.searchStr+".*$").FindAllStringIndex(regexp.MustCompile("\\033\\[\\d+\\[m(.+?)0m").ReplaceAllString(p.str, "$1"), p.searchIndex)
 }
 
 func (p *Pager) searchForward() {
 	matched := p.searchString()
 	if len(matched) >= p.searchIndex {
-		p.ignoreY = p.getLines(p.Str[0:matched[p.searchIndex-1][1]]) - 1
+		p.ignoreY = p.getLines(p.str[0:matched[p.searchIndex-1][1]]) - 1
 		p.searchIndex++
 	}
 }
@@ -272,7 +272,7 @@ func (p *Pager) searchBackward() {
 	matched := p.searchString()
 	if len(matched) > 0 && p.searchIndex > 2 {
 		p.searchIndex--
-		p.ignoreY = p.getLines(p.Str[0:matched[p.searchIndex-1][1]]) - 1
+		p.ignoreY = p.getLines(p.str[0:matched[p.searchIndex-1][1]]) - 1
 	}
 }
 
@@ -283,7 +283,7 @@ func (p *Pager) getLines(s string) (l int) {
 }
 
 func (p *Pager) scrollDown() {
-	lines := p.getLines(p.Str)
+	lines := p.getLines(p.str)
 	_, y := termbox.Size()
 	if p.ignoreY < lines-y {
 		p.ignoreY++
