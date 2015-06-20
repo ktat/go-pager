@@ -51,8 +51,8 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 			y++
 			minusX = i + 1
 		}
-		if (searchStringLen > 0 && i+searchStringLen < len(runes)) {
-			if (string(runes[i : i+searchStringLen]) == p.searchStr[foundIndex:searchStringLen]) {
+		if searchStringLen > 0 && i+searchStringLen < len(runes) {
+			if string(runes[i:i+searchStringLen]) == p.searchStr[foundIndex:searchStringLen] {
 				backgroundColor = termbox.ColorCyan
 				foundIndex = searchStringLen - 1
 			} else if foundIndex == 0 {
@@ -101,14 +101,14 @@ func (p *Pager) Draw() {
 	file := ""
 	nextFileUsage := ""
 	if p.File != "" {
-		file = "[file: " + p.File + " ] ::"
+		file = " :: [file: " + p.File + " ]"
 	}
 	if p.isSearchMode {
-		mode = " :: " + fmt.Sprintf(file+"[searching: %s (lines: %d)] :: [forward search: n] [backward search: N] [exit search: ESC/Ctrl-C]", p.searchStr, p.ignoreY)
+		mode = fmt.Sprintf(file+" :: [searching: %s (lines: %d)] :: [forward search: n] [backward search: N] [exit search: ESC/Ctrl-C]", p.searchStr, p.ignoreY)
 	} else if p.isSlashOn {
-		mode = " :: " + fmt.Sprintf(file+"[input search string: %s ]", p.searchStr)
+		mode = fmt.Sprintf(file+" :: [input search string: %s ]", p.searchStr)
 	} else if file != "" {
-		mode = " :: " + file
+		mode = file
 	}
 	if len(p.Files) > 1 {
 		nextFileUsage = "[next file: Ctrl-h,Ctrl-l]"
@@ -137,7 +137,7 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			return 1
 		}
 		p.Draw()
-	case termbox.KeyCtrlN, termbox.KeyArrowDown,termbox.KeyEnter:
+	case termbox.KeyCtrlN, termbox.KeyArrowDown, termbox.KeyEnter:
 		p.scrollDown()
 	case termbox.KeyCtrlP, termbox.KeyArrowUp:
 		p.scrollUp()
@@ -217,7 +217,7 @@ func (p *Pager) PollEvent() bool {
 						p.isSearchMode = false
 						p.isSlashOn = false
 						p.searchStr = ""
-					} else	if ev.Ch == 'n' {
+					} else if ev.Ch == 'n' {
 						p.searchForward()
 					} else if ev.Ch == 'N' {
 						p.searchBackward()
@@ -265,8 +265,6 @@ func (p *Pager) searchForward() {
 	if len(matched) >= p.searchIndex {
 		p.ignoreY = p.getLines(p.Str[0:matched[p.searchIndex-1][1]]) - 1
 		p.searchIndex++
-	} else {
-		p.ignoreY = p.searchIndex -1
 	}
 }
 
@@ -275,8 +273,6 @@ func (p *Pager) searchBackward() {
 	if len(matched) > 0 && p.searchIndex > 2 {
 		p.searchIndex--
 		p.ignoreY = p.getLines(p.Str[0:matched[p.searchIndex-1][1]]) - 1
-	} else {
-		p.ignoreY = p.searchIndex -1
 	}
 }
 
