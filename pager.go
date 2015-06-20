@@ -162,8 +162,7 @@ func (p *Pager) Draw() {
 	if len(p.Files) > 1 {
 		nextFileUsage = "[next file: Ctrl-h,Ctrl-l]"
 	}
-	searchIndex := fmt.Sprintf("(Index: %d)", p.searchIndex)
-	p.drawLine(0, 0, "USAGE [exit: ESC/q] [scroll: j,k/C-n,C-p] "+searchIndex+nextFileUsage+mode+string(empty), false)
+	p.drawLine(0, 0, "USAGE [exit: ESC/q] [scroll: j,k/C-n,C-p] "+nextFileUsage+mode+string(empty), false)
 	termbox.Flush()
 }
 
