@@ -6,6 +6,12 @@ import (
 	"regexp"
 )
 
+const (
+	QUIT      = 0
+	NEXT_FILE = 1
+	NO_ACTION = 2
+)
+
 type Pager struct {
 	str          string   // contents to display
 	lines        int      // num of lines in str
@@ -155,7 +161,7 @@ func (p *Pager) Draw() {
 	if p.isSearchMode {
 		mode = fmt.Sprintf(file+" :: [searching: %s (lines: %d)] :: [forward search: n] [backward search: N] [exit search: ESC/Ctrl-C]", p.searchStr, p.ignoreY)
 	} else if p.isSlashOn {
-		mode = fmt.Sprintf(file+" :: [input search string: %s ]", p.searchStr)
+		mode = fmt.Sprintf(file+" :: [search string: %s ]", p.searchStr)
 	} else if file != "" {
 		mode = file
 	}
@@ -170,22 +176,22 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 	switch ev.Key {
 	case termbox.KeyEsc, termbox.KeyCtrlC:
 		termbox.Flush()
-		return 0
+		return QUIT
 	case termbox.KeyArrowRight, termbox.KeyCtrlL:
 		if p.isMaxIndex() {
 			p.Index--
 		} else {
+			p.ignoreY = 0
 			termbox.Sync()
+			return NEXT_FILE
 		}
-		termbox.Flush()
-		return 1
 	case termbox.KeyArrowLeft, termbox.KeyCtrlH:
 		if p.Index >= 1 {
 			p.Index -= 2
+			p.ignoreY = 0
 			termbox.Sync()
-			return 1
+			return NEXT_FILE
 		}
-		p.Draw()
 	case termbox.KeyCtrlN, termbox.KeyArrowDown, termbox.KeyEnter:
 		p.scrollDown()
 	case termbox.KeyCtrlP, termbox.KeyArrowUp:
@@ -212,15 +218,18 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			p.scrollUp()
 		} else if ev.Ch == 'q' {
 			termbox.Sync()
-			return 0
+			return QUIT
 		} else if ev.Ch == '<' {
 			p.ignoreY = 0
-			return 1
+			termbox.Sync()
+			p.Draw()
 		} else if ev.Ch == '>' {
 			matched := regexp.MustCompile("(?s)\\n").FindAllString(p.str, -1)
 			_, y := termbox.Size()
 			p.ignoreY = len(matched) - y
-			println(p.ignoreY)
+			if p.ignoreY < 0 {
+				p.ignoreY = 0
+			}
 			termbox.Sync()
 			p.Draw()
 		} else if ev.Ch == '/' {
@@ -231,7 +240,7 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			p.Draw()
 		}
 	}
-	return 2
+	return NO_ACTION
 }
 
 func (p *Pager) PollEvent() bool {
@@ -246,6 +255,7 @@ func (p *Pager) PollEvent() bool {
 				} else if ret == 0 {
 					return false
 				}
+				p.Draw()
 			default:
 				p.Draw()
 			}
