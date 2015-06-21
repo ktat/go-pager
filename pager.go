@@ -7,6 +7,8 @@ import (
 )
 
 const (
+	DEBUG = false
+
 	QUIT      = 0
 	NEXT_FILE = 1
 	NO_ACTION = 2
@@ -55,8 +57,7 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 		"4m": termbox.AttrUnderline,
 	}
 
-	if false {
-		// for debug
+	if DEBUG {
 		for i := 0; i < len(runes); i++ {
 			if runes[i] == '\033' {
 				print("ESC")

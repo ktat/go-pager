@@ -4,7 +4,7 @@ pager.
 
 # Usage
 
-see examle.
+see example.
 
 # License
 
