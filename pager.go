@@ -77,7 +77,7 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 		}
 		if searchStringLen > 0 && i+searchStringLen < len(runes) { // highlight search string
 			if string(runes[i:i+searchStringLen]) == p.searchStr[foundIndex:searchStringLen] {
-				backgroundColor = termbox.ColorCyan
+				backgroundColor = termbox.AttrReverse
 				foundIndex = searchStringLen - 1
 			} else if foundIndex == 0 {
 				backgroundColor = termbox.ColorDefault
