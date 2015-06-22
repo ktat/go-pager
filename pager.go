@@ -19,6 +19,7 @@ type Pager struct {
 	lines        int      // num of lines in str
 	Files        []string // files
 	ignoreY      int      // ignore lines
+	ignoreX      int      // ignore columns
 	Index        int      // file index
 	File         string   // current file
 	isSlashOn    bool     // input search string mode
@@ -39,7 +40,7 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 	foundIndex := 0
 	runes := []rune(str)
 
-	minusX := 0
+	minusX := p.ignoreX
 
 	colorMap := map[string]termbox.Attribute{
 		"0m": termbox.ColorBlack,
@@ -72,7 +73,7 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == '\n' {
 			y++
-			minusX = i + 1
+			minusX = i + (1 + p.ignoreX)
 		}
 		if searchStringLen > 0 && i+searchStringLen < len(runes) { // highlight search string
 			if string(runes[i:i+searchStringLen]) == p.searchStr[foundIndex:searchStringLen] {
@@ -217,17 +218,23 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			p.scrollDown()
 		} else if ev.Ch == 'k' {
 			p.scrollUp()
+		} else if ev.Ch == 'l' {
+			p.scrollRight()
+		} else if ev.Ch == 'h' {
+			p.scrollLeft()
 		} else if ev.Ch == 'q' {
 			termbox.Sync()
 			return QUIT
 		} else if ev.Ch == '<' {
 			p.ignoreY = 0
+			p.ignoreX = 0
 			termbox.Sync()
 			p.Draw()
 		} else if ev.Ch == '>' {
 			matched := regexp.MustCompile("(?s)\\n").FindAllString(p.str, -1)
 			_, y := termbox.Size()
 			p.ignoreY = len(matched) - y
+			p.ignoreX = 0
 			if p.ignoreY < 0 {
 				p.ignoreY = 0
 			}
@@ -356,6 +363,18 @@ func (p *Pager) scrollDown() {
 func (p *Pager) scrollUp() {
 	if p.ignoreY > 0 {
 		p.ignoreY--
+	}
+	p.Draw()
+}
+
+func (p *Pager) scrollRight() {
+	p.ignoreX++
+	p.Draw()
+}
+
+func (p *Pager) scrollLeft() {
+	if p.ignoreX > 0 {
+		p.ignoreX--
 	}
 	p.Draw()
 }
