@@ -34,6 +34,12 @@ func (p *Pager) SetContent(s string) {
 	p.lines = len(lines)
 }
 
+func (p *Pager) AddContent(s string) {
+	p.str += s
+	lines := regexp.MustCompile("(?m)$").FindAllString(p.str, -1)
+	p.lines = len(lines)
+}
+
 func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 	color := termbox.ColorDefault
 	backgroundColor := termbox.ColorDefault
@@ -69,14 +75,15 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 		panic(1)
 	}
 
-	searchStringLen := len(p.searchStr)
+	searchString := p.searchStr
+	searchStringLen := len(searchString)
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == '\n' {
 			y++
 			minusX = i + (1 + p.ignoreX)
 		}
 		if searchStringLen > 0 && i+searchStringLen < len(runes) { // highlight search string
-			if string(runes[i:i+searchStringLen]) == p.searchStr[foundIndex:searchStringLen] {
+			if string(runes[i:i+searchStringLen]) == searchString[foundIndex:searchStringLen] {
 				backgroundColor = termbox.AttrReverse
 				foundIndex = searchStringLen - 1
 			} else if foundIndex == 0 {
@@ -214,23 +221,24 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 		}
 		p.Draw()
 	default:
-		if ev.Ch == 'j' {
+		switch ev.Ch {
+		case 'j':
 			p.scrollDown()
-		} else if ev.Ch == 'k' {
+		case 'k':
 			p.scrollUp()
-		} else if ev.Ch == 'l' {
+		case 'l':
 			p.scrollRight()
-		} else if ev.Ch == 'h' {
+		case 'h':
 			p.scrollLeft()
-		} else if ev.Ch == 'q' {
+		case 'q':
 			termbox.Sync()
 			return QUIT
-		} else if ev.Ch == '<' {
+		case '<':
 			p.ignoreY = 0
 			p.ignoreX = 0
 			termbox.Sync()
 			p.Draw()
-		} else if ev.Ch == '>' {
+		case '>':
 			matched := regexp.MustCompile("(?s)\\n").FindAllString(p.str, -1)
 			_, y := termbox.Size()
 			p.ignoreY = len(matched) - y
@@ -240,11 +248,11 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			}
 			termbox.Sync()
 			p.Draw()
-		} else if ev.Ch == '/' {
+		case '/':
 			p.isSlashOn = true
 			p.isSearchMode = false
 			p.Draw()
-		} else {
+		default:
 			p.Draw()
 		}
 	}
