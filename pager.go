@@ -3,7 +3,9 @@ package pager
 import (
 	"fmt"
 	"github.com/nsf/termbox-go"
+	"log"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -31,6 +33,8 @@ type Pager struct {
 func (p *Pager) SetContent(s string) {
 	p.str = s
 	lines := regexp.MustCompile("(?m)$").FindAllString(p.str, -1)
+	p.ignoreX = 0
+	p.ignoreY = 0
 	p.lines = len(lines)
 }
 
@@ -67,9 +71,9 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 	if DEBUG {
 		for i := 0; i < len(runes); i++ {
 			if runes[i] == '\033' {
-				print("ESC")
+				log.Println("ESC")
 			} else {
-				print(string(runes[i]))
+				log.Println(string(runes[i]))
 			}
 		}
 		panic(1)
@@ -83,7 +87,9 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 			minusX = i + (1 + p.ignoreX)
 		}
 		if searchStringLen > 0 && i+searchStringLen < len(runes) { // highlight search string
-			if string(runes[i:i+searchStringLen]) == searchString[foundIndex:searchStringLen] {
+			t := strings.ToUpper(string(runes[i : i+searchStringLen]))
+			m := strings.ToUpper(searchString[foundIndex:searchStringLen])
+			if t == m {
 				backgroundColor = termbox.AttrReverse
 				foundIndex = searchStringLen - 1
 			} else if foundIndex == 0 {
@@ -99,6 +105,25 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 				backgroundColor = termbox.ColorDefault
 				i += 2
 				minusX += 2
+				// .[H.[J.[m.top  // .[m.top -
+			} else if i+6 < len(runes) && string(runes[i:i+6]) == "\033[?25l" { // clear \033[J
+				runes = runes[i+12 : len(runes)]
+				if DEBUG {
+					log.Println("1:" + string(runes))
+				}
+				p.SetContent(string(runes))
+				p.drawLine(0, 0, p.str, false)
+				p.Clear()
+				break
+			} else if i+3 < len(runes) && string(runes[i:i+3]) == "\033[J" { // clear \033[J
+				runes = runes[i+4 : len(runes)]
+				if DEBUG {
+					log.Println("2:" + string(runes))
+				}
+				p.SetContent(string(runes))
+				termbox.Sync()
+				p.Draw()
+				break
 			} else if i+3 < len(runes) && runes[i+1] == '[' && runes[i+3] == 'm' {
 				t := string(runes[i+2 : i+4])
 				if t == "0m" { // reset
@@ -151,8 +176,14 @@ func (p *Pager) drawLine(x, y int, str string, canSkip bool) {
 		} else {
 			termbox.SetCell(x+i, y, runes[i], termbox.ColorBlue, termbox.ColorWhite)
 		}
-
 	}
+}
+
+func (p *Pager) Clear() {
+	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	termbox.Flush()
+	termbox.Sync()
+	p.Draw()
 }
 
 func (p *Pager) Draw() {
@@ -186,7 +217,11 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 	case termbox.KeyEsc, termbox.KeyCtrlC:
 		termbox.Flush()
 		return QUIT
-	case termbox.KeyArrowRight, termbox.KeyCtrlL:
+	case termbox.KeyArrowRight:
+		p.scrollRight()
+	case termbox.KeyArrowLeft:
+		p.scrollLeft()
+	case termbox.KeyCtrlL:
 		if p.isMaxIndex() {
 			p.Index--
 		} else {
@@ -194,7 +229,7 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			termbox.Sync()
 			return NEXT_FILE
 		}
-	case termbox.KeyArrowLeft, termbox.KeyCtrlH:
+	case termbox.KeyCtrlH:
 		if p.Index >= 1 {
 			p.Index -= 2
 			p.ignoreY = 0
@@ -206,12 +241,11 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 	case termbox.KeyCtrlP, termbox.KeyArrowUp:
 		p.scrollUp()
 	case termbox.KeyCtrlD, termbox.KeySpace:
-		matched := regexp.MustCompile("(?s)\\n").FindAllString(p.str, -1)
 		_, y := termbox.Size()
-		if p.ignoreY+29 < (len(matched) - y) {
+		if p.ignoreY+29 < (p.lines - y + 1) {
 			p.ignoreY += 29
 		} else {
-			p.ignoreY = len(matched) - y
+			p.ignoreY = p.lines - y + 1
 		}
 		p.Draw()
 	case termbox.KeyCtrlU:
@@ -239,9 +273,8 @@ func (p *Pager) viewModeKey(ev termbox.Event) int {
 			termbox.Sync()
 			p.Draw()
 		case '>':
-			matched := regexp.MustCompile("(?s)\\n").FindAllString(p.str, -1)
 			_, y := termbox.Size()
-			p.ignoreY = len(matched) - y
+			p.ignoreY = p.lines - y + 1
 			p.ignoreX = 0
 			if p.ignoreY < 0 {
 				p.ignoreY = 0
@@ -376,7 +409,10 @@ func (p *Pager) scrollUp() {
 }
 
 func (p *Pager) scrollRight() {
-	p.ignoreX++
+	x, _ := termbox.Size()
+	if p.ignoreX < x {
+		p.ignoreX++
+	}
 	p.Draw()
 }
 
@@ -398,8 +434,8 @@ func (p *Pager) Init() {
 }
 
 func (p *Pager) Close() {
-	termbox.Flush()
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	termbox.Flush()
 	termbox.Sync()
 	termbox.Close()
 }
